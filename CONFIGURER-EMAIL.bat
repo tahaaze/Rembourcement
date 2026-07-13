@@ -1,5 +1,5 @@
 @echo off
-title Configuration Email
+title Configuration
 cd /d "%~dp0"
 
 if exist ".env" del ".env"

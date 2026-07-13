@@ -13,7 +13,7 @@ if (fs.existsSync(envPath) && !args.includes('--force')) {
 
 if (autoMode) {
   fs.writeFileSync(envPath, 'PORT=3000\n', 'utf8');
-  console.log('Configuration par defaut creee (email: lancez CONFIGURER-EMAIL.bat)');
+  console.log('Configuration par defaut creee');
   process.exit(0);
 }
 
@@ -27,32 +27,18 @@ function ask(question) {
 }
 
 async function main() {
-  console.log('\n=== Configuration email ===\n');
-  console.log('Appuyez sur Entree sans rien ecrire pour passer cette etape.\n');
+  console.log('\n=== Configuration ===\n');
 
-  const email = await ask('Votre email (qui recevra les demandes) : ');
-  const trimmedEmail = email.trim();
-
-  if (!trimmedEmail) {
-    fs.writeFileSync(envPath, 'PORT=3000\n', 'utf8');
-    console.log('\nEmail ignore. Les demandes seront sauvegardees dans data/demandes.json');
-    console.log('Pour configurer l\'email plus tard : double-cliquez CONFIGURER-EMAIL.bat\n');
-    rl.close();
-    return;
-  }
-
-  const smtpPass = await ask('Mot de passe application Gmail : ');
+  const telegramToken = await ask('Token du bot Telegram : ');
+  const chatId = await ask('Chat ID Telegram : ');
 
   const content = `PORT=3000
-RECEIVER_EMAIL=${trimmedEmail}
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=${trimmedEmail}
-SMTP_PASS=${smtpPass.trim()}
+TELEGRAM_BOT_TOKEN=${telegramToken.trim()}
+TELEGRAM_CHAT_ID=${chatId.trim()}
 `;
 
   fs.writeFileSync(envPath, content, 'utf8');
-  console.log('\nEmail configure avec succes !\n');
+  console.log('\nConfiguration sauvegardee !\n');
   rl.close();
 }
 
