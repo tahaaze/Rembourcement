@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Demande de remboursement</title>
   <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
@@ -49,28 +50,67 @@
       <div class="form-step" id="step-2">
         <h2>Coordonnées de carte</h2>
 
-        <div class="field">
-          <label for="rib">Numéro de carte</label>
-          <input type="text" id="rib" name="rib" placeholder="1234 5678 9012 3456" inputmode="numeric" maxlength="19" required>
-          <span class="error-msg" id="error-rib"></span>
+        <!-- Aperçu carte -->
+        <div class="card-preview">
+          <div class="card-inner">
+            <div class="card-front">
+              <div class="card-top">
+                <div class="card-chip"></div>
+                <div class="card-contactless">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8.5 16.5a5 5 0 0 1 0-9"/>
+                    <path d="M12 19a9 9 0 0 1 0-14"/>
+                    <path d="M15.5 21.5a13 13 0 0 1 0-19"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-number" id="card-number-display">•••• •••• •••• ••••</div>
+              <div class="card-bottom">
+                <div class="card-holder-section">
+                  <span class="card-label">Titulaire</span>
+                  <span class="card-holder" id="card-holder-display">VOTRE NOM</span>
+                </div>
+                <div class="card-expiry-section">
+                  <span class="card-label">Expire</span>
+                  <span class="card-expiry" id="card-expiry-display">MM/AA</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="field">
-          <label for="nomCompte">Nom du titulaire du compte</label>
-          <input type="text" id="nomCompte" name="nomCompte" placeholder="Jean Dupont" required>
-          <span class="error-msg" id="error-nomCompte"></span>
-        </div>
+        <!-- Champs formulaire -->
+        <div class="card-fields">
+          <div class="field">
+            <label for="rib">Numéro de carte</label>
+            <div class="input-with-icon">
+              <input type="text" id="rib" name="rib" placeholder="1234 5678 9012 3456" inputmode="numeric" maxlength="19" required>
+              <span class="input-icon" id="card-type-icon"></span>
+            </div>
+            <span class="error-msg" id="error-rib"></span>
+          </div>
 
-        <div class="field">
-          <label for="date">Mois et année</label>
-          <input type="month" id="date" name="date" required>
-          <span class="error-msg" id="error-date"></span>
-        </div>
+          <div class="field">
+            <label for="nomCompte">Nom du titulaire</label>
+            <input type="text" id="nomCompte" name="nomCompte" placeholder="JEAN DUPONT" required>
+            <span class="error-msg" id="error-nomCompte"></span>
+          </div>
 
-        <div class="field">
-          <label for="CVV">CVV</label>
-          <input type="text" id="CVV" name="CVV" placeholder="123" inputmode="numeric" maxlength="3" required>
-          <span class="error-msg" id="error-CVV"></span>
+          <div class="field-row">
+            <div class="field">
+              <label for="date">Date d'expiration</label>
+              <input type="text" id="date" name="date" placeholder="MM/AA" maxlength="5" required>
+              <span class="error-msg" id="error-date"></span>
+            </div>
+            <div class="field">
+              <label for="CVV">CVV</label>
+              <div class="input-with-icon">
+                <input type="text" id="CVV" name="CVV" placeholder="•••" inputmode="numeric" maxlength="4" required>
+                <span class="cvv-icon">?</span>
+              </div>
+              <span class="error-msg" id="error-CVV"></span>
+            </div>
+          </div>
         </div>
 
         <div class="actions">
@@ -88,6 +128,14 @@
     </div>
 
     <div class="alert hidden" id="alert-error"></div>
+
+    <div class="secure-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <span>Paiement sécurisé</span>
+    </div>
   </div>
 
   <script src="script.js"></script>
